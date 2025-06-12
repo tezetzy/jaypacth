@@ -37,10 +37,12 @@ jobs:
      #   git clone ssh://git@github.com/RusJJ/GTASAAndroid_Structs.git ./structs
      #   mv ./structs/* ./
 
-    - name: Install Android NDK (r25c)...
-      uses: nttld/setup-ndk@v1
+    - uses: nttld/setup-ndk@v1
+
       with:
-        ndk-version: r25c
+
+        ndk-version: r21
+
         local-cache: true
 
     - name: Build the code...
