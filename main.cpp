@@ -2,8 +2,13 @@
 #include <mod/logger.h>
 #include <mod/config.h>
 #include <dlfcn.h>
+#include <vector>
+#include <cctype>
+#include <array>
+#include <utility>
 
-#include <sys/system_properties.h>
+#include "AArch64_ModHelper/ARMv8_ASMHelper.h"
+    #include "GTASA_STRUCTS_210.h"
 
 MYMODCFG(net.jaysiii.aml, Logika, 1.0, jaysiii)
 
