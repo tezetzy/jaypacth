@@ -3,7 +3,7 @@
 #include <mod/config.h>
 #include <dlfcn.h>
 
-#include "GTASA_STRUCTS.h"
+#include <sys/system_properties.h>
 
 MYMODCFG(net.jaysiii.aml, Logika, 1.0, jaysiii)
 
