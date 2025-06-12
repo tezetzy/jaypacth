@@ -76,58 +76,8 @@ DECL_HOOKv(ControlGunMove, void* self, CVector2D* vec2D) // AimingRifleWalkFix
     ControlGunMove(self, vec2D);
     *ms_fTimeStep = save;
 }
-DECL_HOOKv(ProcessSwimmingResistance, CTaskSimpleSwim* task, CPed* ped)
-{
-    float fSubmergeZ = -1.0f;
-    CVector vecPedMoveSpeed{};
-
-    switch (task->m_nSwimState)
-    {
-        case SWIM_TREAD:
-        case SWIM_SPRINT:
-        case SWIM_SPRINTING: {
-            float fAnimBlendSum = 0.0f;
-            float fAnimBlendDifference = 1.0f;
-
-            CAnimBlendAssociation* animSwimBreast = RpAnimBlendClumpGetAssociationU(ped->m_pRwClump, ANIM_ID_SWIM_BREAST);
-            if (animSwimBreast) {
-                fAnimBlendSum = 0.4f * animSwimBreast->m_fBlendAmount;
-                fAnimBlendDifference = 1.0f - animSwimBreast->m_fBlendAmount;
-            }
-
-            CAnimBlendAssociation* animSwimCrawl = RpAnimBlendClumpGetAssociationU(ped->m_pRwClump, ANIM_ID_SWIM_CRAWL);
-            if (animSwimCrawl) {
-                fAnimBlendSum += 0.2f * animSwimCrawl->m_fBlendAmount;
-                fAnimBlendDifference -= animSwimCrawl->m_fBlendAmount;
-            }
-            if (fAnimBlendDifference < 0.0f) {
-                fAnimBlendDifference = 0.0f;
-            }
-
-            fSubmergeZ = fAnimBlendDifference * 0.55f + fAnimBlendSum;
-
-            vecPedMoveSpeed =  ped->m_vecAnimMovingShiftLocal.x * ped->GetRight();
-            vecPedMoveSpeed += ped->m_vecAnimMovingShiftLocal.y * ped->GetForward();
-            break;
-        }
-        case SWIM_DIVE_UNDERWATER: {
-            vecPedMoveSpeed =  ped->m_vecAnimMovingShiftLocal.x * ped->GetRight();
-            vecPedMoveSpeed += ped->m_vecAnimMovingShiftLocal.y * ped->GetForward();
-
-            auto animSwimDiveUnder = RpAnimBlendClumpGetAssociationU(ped->m_pRwClump, ANIM_ID_SWIM_DIVE_UNDER);
-            if (animSwimDiveUnder) {
-                vecPedMoveSpeed.z = animSwimDiveUnder->m_fCurrentTime / animSwimDiveUnder->m_pAnimBlendHierarchy->m_fTotalTime * 
-                #ifndef SWIMSPEED_FIX
-                    -0.1f;
-                #else
-                    (-0.1f * GetTimeStepMagic());
-                #endif
-            }
-            break;
-        }
-        case SWIM_UNDERWATER_SPRINTING: {
             vecPedMoveSpeed   =  ped->m_vecAnimMovingShiftLocal.x * ped->GetRight();
-            vecPedMoveSpeed   += cosf(task->m_fRotationX) * ped->m_vecAnimMovingShiftLocal.y * ped->GetForward();
+            vecPedMoveSpeeinid   += cosf(task->m_fRotationX) * ped->m_vecAnimMovingShiftLocal.y * ped->GetForward();
             vecPedMoveSpeed.z += (sinf(task->m_fRotationX) * ped->m_vecAnimMovingShiftLocal.y + 0.01f)
             #ifdef SWIMSPEED_FIX
                 / GetTimeStepMagic()
@@ -155,89 +105,12 @@ DECL_HOOKv(ProcessSwimmingResistance, CTaskSimpleSwim* task, CPed* ped)
         }
     }
 
-    vecPedMoveSpeed *= (1.0f - fTheTimeStep)
-    #ifdef SWIMSPEED_FIX
-        * GetTimeStepInvMagic()
-    #endif
-    ;
-    ped->m_vecMoveSpeed *= fTheTimeStep;
-    #ifdef SWIMSPEED_FIX
-        if(ped->IsPlayer()) vecPedMoveSpeed *= 1.25f;
-    #endif
-    ped->m_vecMoveSpeed += vecPedMoveSpeed;
-
-    auto& pedPos = ped->GetPosition();
-    bool bUpdateRotationX = true;
-    CVector vecCheckWaterLevelPos = GetTimeStep() * ped->m_vecMoveSpeed + pedPos;
-    float fWaterLevel = 0.0f;
-    if (!GetWaterLevel(vecCheckWaterLevelPos, fWaterLevel, true, NULL)) {
-        fSubmergeZ = -1.0f;
-        bUpdateRotationX = false;
-    } else {
-        if (task->m_nSwimState != SWIM_UNDERWATER_SPRINTING || task->m_fStateChanger < 0.0f) {
-            bUpdateRotationX = false;
-        } else {
-            if (pedPos.z + 0.65f > fWaterLevel && task->m_fRotationX > 0.7854f) {
-                task->m_nSwimState = SWIM_TREAD;
-                task->m_fStateChanger = 0.0f;
-                bUpdateRotationX = false;
-            }
-        }
-    }
-
-    if (bUpdateRotationX) {
-        if (task->m_fRotationX >= 0.0f) {
-            if (pedPos.z + 0.65f <= fWaterLevel) {
-                if (task->m_fStateChanger <= 0.001f)
-                    task->m_fStateChanger = 0.0f;
-                else
-                    task->m_fStateChanger *= 0.95f;
-            } else {
-                float fMinimumSpeed = 0.05f * 0.5f;
-                if (task->m_fStateChanger > fMinimumSpeed) {
-                    task->m_fStateChanger *= 0.95f;
-                }
-                if (task->m_fStateChanger < fMinimumSpeed) {
-                    task->m_fStateChanger += GetTimeStepInSeconds() / 10.0f;
-                    task->m_fStateChanger = std::min(fMinimumSpeed, task->m_fStateChanger);
-                }
-                task->m_fRotationX += GetTimeStep() * task->m_fStateChanger;
-                fSubmergeZ = (0.55f - 0.2f) * (task->m_fRotationX * 4.0f / PI) * 0.75f + 0.2f;
-            }
-        } else {
-            if (pedPos.z - sin(task->m_fRotationX) + 0.65f <= fWaterLevel) {
-                if (task->m_fStateChanger > 0.001f)
-                    task->m_fStateChanger *= 0.95f;
-                else
-                    task->m_fStateChanger = 0.0f;
-            } else {
-                task->m_fStateChanger += GetTimeStepInSeconds() / 10.0f;
-                task->m_fStateChanger = std::min(task->m_fStateChanger, 0.05f);
-            }
-            task->m_fRotationX += GetTimeStep() * task->m_fStateChanger;
-        }
-    }
+     *= 0.95f;
 float fWideScreenWidthScale, fWideScreenHeightScale;
 DECL_HOOKv(DrawCrosshair)
 {
     static constexpr float XSVal = 1024.0f / 1920.0f; // prev. 0.530, now it's 0.533333..3
     static constexpr float YSVal = 768.0f / 1920.0f; // unchanged :p
-
-    CPlayerPed* player = WorldPlayers[0].m_pPed;
-    if(player->m_Weapons[player->m_byteCurrentWeaponSlot].m_nType == WEAPON_COUNTRYRIFLE)
-    {
-        // Weirdo logic but ok
-        float save1 = *m_f3rdPersonCHairMultX; *m_f3rdPersonCHairMultX = 0.530f - 0.84f * ar43 * 0.01115f; // 0.01125f;
-        float save2 = *m_f3rdPersonCHairMultY; *m_f3rdPersonCHairMultY = 0.400f + 0.84f * ar43 * 0.038f; // 0.03600f;
-        DrawCrosshair();
-        *m_f3rdPersonCHairMultX = save1; *m_f3rdPersonCHairMultY = save2;
-        return;
-    }
-
-    float save1 = *m_f3rdPersonCHairMultX; *m_f3rdPersonCHairMultX = 0.530f - fAspectCorrection * 0.01115f; // 0.01125f;
-    float save2 = *m_f3rdPersonCHairMultY; *m_f3rdPersonCHairMultY = 0.400f + fAspectCorrection * 0.038f; // 0.03600f;
-    DrawCrosshair();
-    *m_f3rdPersonCHairMultX = save1; *m_f3rdPersonCHairMultY = save2;
 }
 
 DECL_HOOKv(CalculateAspectRatio_CrosshairFix)
@@ -302,12 +175,6 @@ extern "C" void OnModLoad()
     if(cfg->Bind("FixAimingWalkRifle", true, "Gameplay")->GetBool())
     {
         HOOKPLT(ControlGunMove, pGTASA + 0x66F9D0);
-    }
-
-    // Fix slow swimming speed
-    if(cfg->Bind("SwimmingSpeedFix", true, "Gameplay")->GetBool())
-    {
-        HOOKPLT(ProcessSwimmingResistance, pGTASA + 0x66E584);
     }
     if(cfg->GetBool("HighFPSAimingWalkingFix", true, "Gameplay"))
     {
