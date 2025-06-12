@@ -70,49 +70,81 @@ DECL_HOOKv(EntityRender, CEntity* ent)
     EntityRender(ent);
     //RwRenderStateSet(rwRENDERSTATECULLMODE, (void*)rwCULLMODECULLBACK);
 }
+int moon_alphafunc, moon_vertexblend;
+uintptr_t MoonVisual_1_BackTo;
+extern "C" void MoonVisual_1(void)
+{
+    _rwOpenGLGetRenderState(rwRENDERSTATEALPHATESTFUNCTION, &moon_alphafunc);
+    _rwOpenGLGetRenderState(rwRENDERSTATEVERTEXALPHAENABLE, &moon_vertexblend);
+    _rwOpenGLSetRenderState(rwRENDERSTATEALPHATESTFUNCTION, rwALPHATESTFUNCTIONALWAYS);
+    _rwOpenGLSetRenderState(rwRENDERSTATEVERTEXALPHAENABLE, true);
+
+    _rwOpenGLSetRenderState(rwRENDERSTATESRCBLEND, rwBLENDSRCALPHA);
+    _rwOpenGLSetRenderState(rwRENDERSTATEDESTBLEND, rwBLENDZERO);
+}
+__attribute__((optnone)) __attribute__((naked)) void MoonVisual_1_inject(void)
+{
+    asm volatile(
+        "push {r0-r11}\n"
+        "bl MoonVisual_1\n");
+    asm volatile(
+        "mov r12, %0\n"
+        "pop {r0-r11}\n"
+        "bx r12\n"
+    :: "r" (MoonVisual_1_BackTo));
+}
+uintptr_t MoonVisual_2_BackTo;
+extern "C" void MoonVisual_2(void)
+{
+    _rwOpenGLSetRenderState(rwRENDERSTATEALPHATESTFUNCTION, moon_alphafunc);
+    _rwOpenGLSetRenderState(rwRENDERSTATEVERTEXALPHAENABLE, moon_vertexblend);
+    _rwOpenGLSetRenderState(rwRENDERSTATESRCBLEND, rwBLENDONE);
+    _rwOpenGLSetRenderState(rwRENDERSTATESRCBLEND, rwBLENDDESTALPHA);
+    _rwOpenGLSetRenderState(rwRENDERSTATEZWRITEENABLE, false);
+}
+__attribute__((optnone)) __attribute__((naked)) void MoonVisual_2_inject(void)
+{
+    asm volatile(
+        "push {r0-r11}\n"
+        "bl MoonVisual_2\n");
+    asm volatile(
+        "mov r12, %0\n"
+        "pop {r0-r11}\n"
+        "bx r12\n"
+    :: "r" (MoonVisual_2_BackTo));
+}
+DECL_HOOKv(CameraProcess_HighFPS, void* self)
+{
+    float DrunkRotationBak = *DrunkRotation;
+    CameraProcess_HighFPS(self);
+    if(DrunkRotationBak != *DrunkRotation)
+    {
+        *DrunkRotation = DrunkRotationBak + 5.0f * GetTimeStepMagic();
+    }
+}
 DECL_HOOKv(ControlGunMove, void* self, CVector2D* vec2D) // AimingRifleWalkFix
 {
     float save = *ms_fTimeStep; *ms_fTimeStep = fMagic;
     ControlGunMove(self, vec2D);
     *ms_fTimeStep = save;
 }
-            vecPedMoveSpeed   =  ped->m_vecAnimMovingShiftLocal.x * ped->GetRight();
-            vecPedMoveSpeeinid   += cosf(task->m_fRotationX) * ped->m_vecAnimMovingShiftLocal.y * ped->GetForward();
-            vecPedMoveSpeed.z += (sinf(task->m_fRotationX) * ped->m_vecAnimMovingShiftLocal.y + 0.01f)
-            #ifdef SWIMSPEED_FIX
-                / GetTimeStepMagic()
-            #endif
-            ;
-            break;
-        }
-        case SWIM_BACK_TO_SURFACE: {
-            auto animClimb = RpAnimBlendClumpGetAssociationU(ped->m_pRwClump, ANIM_ID_CLIMB_JUMP);
-            if (!animClimb)
-                animClimb = RpAnimBlendClumpGetAssociationU(ped->m_pRwClump, ANIM_ID_SWIM_JUMPOUT);
-
-            if (animClimb) {
-                if (animClimb->m_pAnimBlendHierarchy->m_fTotalTime > animClimb->m_fCurrentTime &&
-                    (animClimb->m_fBlendAmount >= 1.0f || animClimb->m_fBlendDelta > 0.0f)
-                ) {
-                    float fMoveForceZ = GetTimeStep() * ped->m_fMass * 0.3f * 0.008f;
-                    ApplyMoveForce(ped, 0.0f, 0.0f, fMoveForceZ);
-                }
-            }
-            return;
-        }
-        default: {
-            return;
-        }
-    }
-
-     *= 0.95f;
 float fWideScreenWidthScale, fWideScreenHeightScale;
 DECL_HOOKv(DrawCrosshair)
 {
     static constexpr float XSVal = 1024.0f / 1920.0f; // prev. 0.530, now it's 0.533333..3
     static constexpr float YSVal = 768.0f / 1920.0f; // unchanged :p
 }
-
+DECL_HOOKv(ProcessBuoyancy, void* self, CPhysical* phy, float unk, CVector* vec1, CVector* vec2) // BuoyancySpeedFix
+{
+    if(phy->m_nType == ENTITY_TYPE_PED && ((CPed*)phy)->m_nPedType == PED_TYPE_PLAYER1)
+    {
+        float save = *ms_fTimeStep; *ms_fTimeStep = (1.0f + ((save / fMagic) / 1.5f)) * (save / fMagic);
+        ProcessBuoyancy(self, phy, unk, vec1, vec2);
+        *ms_fTimeStep = save;
+        return;
+    }
+    ProcessBuoyancy(self, phy, unk, vec1, vec2);
+}
 DECL_HOOKv(CalculateAspectRatio_CrosshairFix)
 {
     CalculateAspectRatio_CrosshairFix();
