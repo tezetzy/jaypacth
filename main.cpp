@@ -6,6 +6,7 @@
 #include <cctype>
 #include <array>
 #include <utility>
+#include <jayzxy.h>
 
 #include "AArch64_ModHelper/ARMv8_ASMHelper.h"
    // #include "GTASA_STRUCTS_210.h"
@@ -29,6 +30,40 @@ CPlayerInfo* WorldPlayers;
 ///////////////////////////////     Funcs     ///////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 
+float fAspectCorrection = 0.0f, fAspectCorrectionDiv = 0.0f;
+#define fAspectCorrection (*ms_fAspectRatio - ar43)
+#define fAspectCorrectionDiv (*ms_fAspectRatio / ar43)
+#define GetTimeStep() (*ms_fTimeStep)
+#define GetTimeStepInSeconds() (GetTimeStep() / 50.0f)
+#define GetTimeStepMagic() (GetTimeStep() / fMagic)
+#define GetTimeStepInvMagic() (fMagic / GetTimeStep())
+CPlayerInfo                 *WorldPlayers;
+CIntVector2D                *windowSize;
+CCamera                     *TheCamera;
+RsGlobalType                *RsGlobal;
+MobileMenu                  *gMobileMenu;
+CWidget                     **m_pWidgets;
+ScriptVariables*            ScriptParams;
+CLinkList<AlphaObjectInfo>  *m_alphaList;
+CPool<CCutsceneObject>      **pObjectPool;
+CZoneInfo                   **m_pCurrZoneInfo;
+CWeaponInfo                 *aWeaponInfo;
+CPolyBunch                  *aPolyBunches;
+CBaseModelInfo              **ms_modelInfoPtrs;
+CRGBA                       *ms_vehicleColourTable;
+CRGBA                       *HudColour;
+CTaskComplexSequence        *ms_taskSequence;
+CRunningScript              **pActiveScripts;
+void                        *g_surfaceInfos;
+RwTexture                   **ms_pRemapTexture;
+CIdleCam                    *gIdleCam;
+CLinkList<CCollisionData*>  *ms_colModelCache;
+TDBArray<RwTexture*>        *detailTextures;
+RwRaster                    **pRasterFrontBuffer;
+GlobalSceneTag              *Scene;
+void                        *TheText;
+RQRenderTarget              **SelectedRQTarget, **backTarget, **oldTarget;
+CSprite2d                   *HudSprites;
 
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Hooks     ///////////////////////////////
