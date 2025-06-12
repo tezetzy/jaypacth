@@ -23,95 +23,14 @@ CPlayerInfo* WorldPlayers;
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Funcs     ///////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
-void Redirect(uintptr_t addr, uintptr_t to)
-{
-    if(!addr) return;
-    if(addr & 1)
-    {
-        addr &= ~1;
-        if (addr & 2)
-        {
-            aml->PlaceNOP(addr, 1);
-            addr += 2;
-        }
-        uint32_t hook[2];
-        hook[0] = 0xF000F8DF;
-        hook[1] = to;
-        aml->Write(addr, (uintptr_t)hook, sizeof(hook));
-    }
-    else
-    {
-        uint32_t hook[2];
-        hook[0] = 0xE51FF004;
-        hook[1] = to;
-        aml->Write(addr, (uintptr_t)hook, sizeof(hook));
-    }
-}
-void (*_rwOpenGLSetRenderState)(RwRenderState, int);
-void (*_rwOpenGLGetRenderState)(RwRenderState, void*);
-void (*ClearPedWeapons)(CPed*);
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Hooks     ///////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
-extern "C" void adadad(void)
+extern "C" void addad(void)
 {
     asm("VMOV.F32 S0, #0.5");
-}
-DECL_HOOKv(EntityRender, CEntity* ent)
-{
-    if(ent->m_nType == ENTITY_TYPE_VEHICLE)
-    {
-        EntityRender(ent);
-        return;
-    }
-
-    //RwRenderStateSet(rwRENDERSTATECULLMODE, (void*)rwCULLMODECULLNONE);
-    EntityRender(ent);
-    //RwRenderStateSet(rwRENDERSTATECULLMODE, (void*)rwCULLMODECULLBACK);
-}
-int moon_alphafunc, moon_vertexblend;
-uintptr_t MoonVisual_1_BackTo;
-extern "C" void MoonVisual_1(void)
-{
-    _rwOpenGLGetRenderState(rwRENDERSTATEALPHATESTFUNCTION, &moon_alphafunc);
-    _rwOpenGLGetRenderState(rwRENDERSTATEVERTEXALPHAENABLE, &moon_vertexblend);
-    _rwOpenGLSetRenderState(rwRENDERSTATEALPHATESTFUNCTION, rwALPHATESTFUNCTIONALWAYS);
-    _rwOpenGLSetRenderState(rwRENDERSTATEVERTEXALPHAENABLE, true);
-
-    _rwOpenGLSetRenderState(rwRENDERSTATESRCBLEND, rwBLENDSRCALPHA);
-    _rwOpenGLSetRenderState(rwRENDERSTATEDESTBLEND, rwBLENDZERO);
-}
-__attribute__((optnone)) __attribute__((naked)) void MoonVisual_1_inject(void)
-{
-    asm volatile(
-        "push {r0-r11}\n"
-        "bl MoonVisual_1\n");
-    asm volatile(
-        "mov r12, %0\n"
-        "pop {r0-r11}\n"
-        "bx r12\n"
-    :: "r" (MoonVisual_1_BackTo));
-}
-uintptr_t MoonVisual_2_BackTo;
-extern "C" void MoonVisual_2(void)
-{
-    _rwOpenGLSetRenderState(rwRENDERSTATEALPHATESTFUNCTION, moon_alphafunc);
-    _rwOpenGLSetRenderState(rwRENDERSTATEVERTEXALPHAENABLE, moon_vertexblend);
-    _rwOpenGLSetRenderState(rwRENDERSTATESRCBLEND, rwBLENDONE);
-    _rwOpenGLSetRenderState(rwRENDERSTATESRCBLEND, rwBLENDDESTALPHA);
-    _rwOpenGLSetRenderState(rwRENDERSTATEZWRITEENABLE, false);
-}
-__attribute__((optnone)) __attribute__((naked)) void MoonVisual_2_inject(void)
-{
-    asm volatile(
-        "push {r0-r11}\n"
-        "bl MoonVisual_2\n");
-    asm volatile(
-        "mov r12, %0\n"
-        "pop {r0-r11}\n"
-        "bx r12\n"
-    :: "r" (MoonVisual_2_BackTo));
 }
 DECL_HOOKv(CameraProcess_HighFPS, void* self)
 {
@@ -133,17 +52,6 @@ DECL_HOOKv(DrawCrosshair)
 {
     static constexpr float XSVal = 1024.0f / 1920.0f; // prev. 0.530, now it's 0.533333..3
     static constexpr float YSVal = 768.0f / 1920.0f; // unchanged :p
-}
-DECL_HOOKv(ProcessBuoyancy, void* self, CPhysical* phy, float unk, CVector* vec1, CVector* vec2) // BuoyancySpeedFix
-{
-    if(phy->m_nType == ENTITY_TYPE_PED && ((CPed*)phy)->m_nPedType == PED_TYPE_PLAYER1)
-    {
-        float save = *ms_fTimeStep; *ms_fTimeStep = (1.0f + ((save / fMagic) / 1.5f)) * (save / fMagic);
-        ProcessBuoyancy(self, phy, unk, vec1, vec2);
-        *ms_fTimeStep = save;
-        return;
-    }
-    ProcessBuoyancy(self, phy, unk, vec1, vec2);
 }
 DECL_HOOKv(CalculateAspectRatio_CrosshairFix)
 {
@@ -191,12 +99,6 @@ extern "C" void OnModLoad()
 {
     pGTASA = aml->GetLib("libGTASA.so");
     hGTASA = dlopen("libGTASA.so", RTLD_LAZY);
-
-    // Functions Start //
-    SET_TO(_rwOpenGLSetRenderState, aml->GetSym(hGTASA, "_Z23_rwOpenGLSetRenderState13RwRenderStatePv"));
-    SET_TO(_rwOpenGLGetRenderState, aml->GetSym(hGTASA, "_Z23_rwOpenGLGetRenderState13RwRenderStatePv"));
-    SET_TO(ClearPedWeapons, aml->GetSym(hGTASA, "_ZN4CPed12ClearWeaponsEv"));
-    // Functions End   //
     
     // Variables Start //
     SET_TO(ms_fTimeStep, aml->GetSym(hGTASA, "_ZN6CTimer12ms_fTimeStepE"));
